@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IC API Gateway — Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#060a10;--surface:#0a0f1a;--border:#1a2236;
+    --text:#e2e8f0;--muted:#64748b;--dim:#334155;
+    --blue:#38bdf8;--green:#34d399;--purple:#a78bfa;--pink:#f472b6;--orange:#fb923c;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;min-height:100vh}
+  
+  header{
+    background:#070c14;border-bottom:1px solid var(--border);
+    padding:16px 32px;display:flex;align-items:center;gap:16px;
+    position:sticky;top:0;z-index:100;
+  }
+  .logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#0ea5e9,#6366f1);
+    display:flex;align-items:center;justify-content:center;font-size:18px;
+    box-shadow:0 0 24px #0ea5e938;}
+  .logo-text{font-family:'Space Mono',monospace;font-weight:700;font-size:15px}
+  .logo-sub{color:var(--muted);font-size:11px;margin-top:2px}
+  .status{margin-left:auto;display:flex;gap:8px}
+  .badge{font-size:10px;padding:4px 10px;border-radius:20px;font-family:'Space Mono',monospace}
+  .badge-green{background:#052e16;color:var(--green)}
+  .badge-blue{background:#0c1a2e;color:var(--blue)}
+
+  .tabs{display:flex;gap:4px;padding:14px 32px 0;border-bottom:1px solid var(--border);background:#070c14}
+  .tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);
+    padding:8px 18px;font-family:'Space Mono',monospace;font-size:12px;cursor:pointer;
+    border-radius:6px 6px 0 0;transition:all .15s}
+  .tab.active{background:#0a0f1a;border-bottom-color:var(--blue);color:var(--text)}
+  .tab:hover:not(.active){color:var(--text)}
+
+  .content{padding:28px 32px;max-width:960px;margin:0 auto}
+  .panel{display:none}.panel.active{display:block}
+
+  h2{font-family:'Space Mono',monospace;font-size:17px;margin-bottom:6px}
+  .subtitle{color:var(--muted);font-size:13px;margin-bottom:24px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:16px}
+  .card-title{font-family:'Space Mono',monospace;font-size:13px;margin-bottom:12px}
+
+  .endpoint-row{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .method{background:#0a1a2a;color:var(--blue);font-family:'Space Mono',monospace;
+    font-size:10px;padding:3px 8px;border-radius:4px;white-space:nowrap}
+  .path{color:#94a3b8;font-family:'Space Mono',monospace;font-size:12px;flex:1}
+  .desc{color:var(--muted);font-size:12px;width:100%}
+
+  .try-section{margin-top:16px}
+  .input-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  select,input{background:#060a10;border:1px solid var(--border);color:var(--text);
+    padding:8px 12px;border-radius:7px;font-family:'Space Mono',monospace;font-size:12px;outline:none}
+  select:focus,input:focus{border-color:var(--blue)}
+  .btn{background:#0ea5e9;color:#fff;border:none;padding:8px 20px;border-radius:7px;
+    font-family:'Space Mono',monospace;font-size:12px;cursor:pointer;transition:background .15s;white-space:nowrap}
+  .btn:hover{background:#0284c7}
+  .btn:disabled{background:#0a2030;color:var(--dim);cursor:wait}
+  .btn-sm{padding:5px 12px;font-size:11px}
+
+  .output{background:#040710;border:1px solid var(--border);border-radius:8px;
+    padding:14px 16px;margin-top:10px;min-height:60px;display:none}
+  .output.show{display:block}
+  .output pre{color:var(--green);font-family:'Space Mono',monospace;font-size:11px;
+    white-space:pre-wrap;word-break:break-all;line-height:1.7}
+  .output.error pre{color:#f87171}
+
+  .arch-pre{color:var(--blue);font-family:'Space Mono',monospace;font-size:11px;
+    line-height:1.8;white-space:pre-wrap}
+
+  .security-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .sec-card{background:#040710;border:1px solid var(--border);border-radius:10px;padding:16px}
+  .sec-card-title{font-size:13px;font-weight:600;margin-bottom:8px}
+  .sec-card p{color:var(--muted);font-size:12px;line-height:1.6}
+
+  .tag{background:#1a2035;color:var(--blue);font-size:10px;
+    padding:2px 8px;border-radius:20px;font-family:'Space Mono',monospace}
+  .tag-green{background:#052e16;color:var(--green)}
+
+  .loading{display:inline-block;animation:spin 1s linear infinite}
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+  @media(max-width:600px){
+    header{padding:12px 16px}.content{padding:16px}
+    .tabs{padding:10px 16px 0}.security-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡</div>
+  <div>
+    <div class="logo-text">IC API Gateway</div>
+    <div class="logo-sub">Intelligent Contract External API Proxy</div>
+  </div>
+  <div class="status">
+    <span class="badge badge-green">🟢 Live</span>
+    <span class="badge badge-blue">v1.0.0</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('weather')">🌦 Weather</button>
+  <button class="tab" onclick="switchTab('price')">📈 Price Feeds</button>
+  <button class="tab" onclick="switchTab('social')">📡 Social</button>
+  <button class="tab" onclick="switchTab('security')">🔐 Security</button>
+  <button class="tab" onclick="switchTab('arch')">🏗 Architecture</button>
+</div>
+
+<div class="content">
+
+  <!-- WEATHER -->
+  <div id="tab-weather" class="panel active">
+    <h2>WeatherLib — Real API</h2>
+    <p class="subtitle">Live OpenWeatherMap data. API key is server-side only — never exposed to client.</p>
+
+    <div class="card">
+      <div class="card-title">🌡 getCurrentWeather(location, units?)</div>
+      <div class="endpoint-row">
+        <span class="method">GET</span>
+        <span class="path">/api/weather?action=current&location=...&units=metric</span>
+      </div>
+      <div class="try-section">
+        <div class="input-row">
+          <input id="w-location" placeholder="City name (e.g. Karachi)" style="flex:1;min-width:160px">
+          <select id="w-units"><option value="metric">Celsius</option><option value="imperial">Fahrenheit</option></select>
+          <button class="btn" onclick="callWeather('current')">▶ Call API</button>
+        </div>
+        <div id="out-weather-current" class="output"><pre></pre></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📅 getForecast(location, days)</div>
+      <div class="endpoint-row">
+        <span class="method">GET</span>
+        <span class="path">/api/weather?action=forecast&location=...&days=5</span>
+      </div>
+      <div class="try-section">
+        <div class="input-row">
+          <input id="w-fc-location" placeholder="City (e.g. Dubai)" style="flex:1;min-width:160px">
+          <select id="w-fc-days">
+            <option value="3">3 days</option><option value="5" selected>5 days</option>
+          </select>
+          <button class="btn" onclick="callWeather('forecast')">▶ Call API</button>
+        </div>
+        <div id="out-weather-forecast" class="output"><pre></pre></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚠ getAlerts(region)</div>
+      <div class="endpoint-row">
+        <span class="method">GET</span>
+        <span class="path">/api/weather?action=alerts&region=...</span>
+      </div>
+      <div class="try-section">
+        <div class="input-row">
+          <input id="w-region" placeholder="Region (e.g. Florida)" style="flex:1;min-width:160px">
+          <button class="btn" onclick="callWeather('alerts')">▶ Call API</button>
+        </div>
+        <div id="out-weather-alerts" class="output"><pre></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRICE -->
+  <div id="tab-price" class="panel">
+    <h2>PriceFeedLib — Real API</h2>
+    <p class="subtitle">Live CoinGecko price data with HMAC-signed responses. Free tier — no key needed.</p>
+
+    <div class="card">
+      <div class="card-title">💲 getPrice(pair)</div>
+      <div class="endpoint-row">
+        <span class="method">GET</span>
+        <span class="path">/api/price?action=price&pair=ETH/USD</span>
+      </div>
+      <div class="try-section">
+        <div class="input-row">
+          <select id="p-pair" style="flex:1">
+            <option>ETH/USD</option><option>BTC/USD</option><option>SOL/USD</option>
+            <option>ARB/USD</option><option>MATIC/USD</option><option>LINK/USD</option>
+          </select>
+          <button class="btn" onclick="callPrice('price')">▶ Call API</button>
+        </div>
+        <div id="out-price-price" class="output"><pre></pre></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 getTWAP(pair, interval)</div>
+      <div class="endpoint-row">
+        <span class="method">GET</span>
+        <span class="path">/api/price?action=twap&pair=ETH/USD&interval=3600</span>
+      </div>
+      <div class="try-section">
+        <div class="input-row">
+          <select id="p-twap-pair" style="flex:1">
+            <option>ETH/USD</option><option>BTC/USD</option><option>SOL/USD</option>
+          </select>
+          <select id="p-interval">
+            <option value="3600">1 Hour TWAP</option>
+            <option value="14400">4 Hour TWAP</option>
+            <option value="86400">24 Hour TWAP</option>
+          </select>
+          <button class="btn" onclick="callPrice('twap')">▶ Call API</button>
+        </div>
+        <div id="out-price-twap" class="output"><pre></pre></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🗂 getMulti(coins)</div>
+      <div class="endpoint-row">
+        <span class="method">GET</span>
+        <span class="path">/api/price?action=multi&coins=bitcoin,ethereum,solana</span>
+      </div>
+      <div class="try-section">
+        <div class="input-row">
+          <input id="p-coins" value="bitcoin,ethereum,solana" style="flex:1">
+          <button class="btn" onclick="callPrice('multi')">▶ Call API</button>
+        </div>
+        <div id="out-price-multi" class="output"><pre></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOCIAL -->
+  <div id="tab-social" class="panel">
+    <h2>SocialLib — Real API</h2>
+    <p class="subtitle">Twitter/X API v2. Bearer token stays on server. Sentiment analysis + trending topics.</p>
+
+    <div class="card">
+      <div class="card-title">🧠 getSentiment(query)</div>
+      <div class="endpoint-row">
+        <span class="method">GET</span>
+        <span class="path">/api/social?action=sentiment&query=$ETH</span>
+      </div>
+      <div class="try-section">
+        <div class="input-row">
+          <input id="s-query" placeholder="Query (e.g. $ETH or bitcoin)" style="flex:1">
+          <button class="btn" onclick="callSocial('sentiment')">▶ Call API</button>
+        </div>
+        <div id="out-social-sentiment" class="output"><pre></pre></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔥 getTrending(category)</div>
+      <div class="endpoint-row">
+        <span class="method">GET</span>
+        <span class="path">/api/social?action=trending&category=crypto&limit=10</span>
+      </div>
+      <div class="try-section">
+        <div class="input-row">
+          <select id="s-category" style="flex:1">
+            <option>crypto</option><option>defi</option><option>nft</option><option>web3</option>
+          </select>
+          <button class="btn" onclick="callSocial('trending')">▶ Call API</button>
+        </div>
+        <div id="out-social-trending" class="output"><pre></pre></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">👤 getProfile(handle)</div>
+      <div class="endpoint-row">
+        <span class="method">GET</span>
+        <span class="path">/api/social?action=profile&handle=VitalikButerin</span>
+      </div>
+      <div class="try-section">
+        <div class="input-row">
+          <input id="s-handle" placeholder="Twitter handle (no @)" style="flex:1">
+          <button class="btn" onclick="callSocial('profile')">▶ Call API</button>
+        </div>
+        <div id="out-social-profile" class="output"><pre></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECURITY -->
+  <div id="tab-security" class="panel">
+    <h2>Key Security Model</h2>
+    <p class="subtitle">API keys never touch the browser, blockchain, or logs. Full proxy pattern with signed responses.</p>
+
+    <div class="security-grid" style="margin-bottom:16px">
+      <div class="sec-card">
+        <div class="sec-card-title" style="color:var(--blue)">🔒 Encryption at Rest</div>
+        <p>API keys are stored as Vercel environment variables, encrypted by Vercel's infrastructure. Locally, stored in <code>.env</code> (gitignored). Never hardcoded.</p>
+      </div>
+      <div class="sec-card">
+        <div class="sec-card-title" style="color:var(--green)">✍ Response Signing</div>
+        <p>Every proxy response includes an HMAC-SHA256 signature over <code>{data, timestamp}</code>. On-chain keepers verify this before submitting data to contracts.</p>
+      </div>
+      <div class="sec-card">
+        <div class="sec-card-title" style="color:var(--purple)">⚡ Rate Limiting</div>
+        <p>60 requests/minute per IP using <code>express-rate-limit</code>. Forwarded-IP aware for Vercel edge network. Returns 429 on breach.</p>
+      </div>
+      <div class="sec-card">
+        <div class="sec-card-title" style="color:var(--pink)">🌐 CORS Policy</div>
+        <p>Endpoints have CORS headers set. In production, restrict <code>Access-Control-Allow-Origin</code> to your frontend domain only.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔍 Verify a Signed Response</div>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:12px">
+        Paste a signed response from any endpoint to verify its signature.
+      </p>
+      <textarea id="verify-input" rows="6" style="width:100%;background:#040710;border:1px solid var(--border);
+        color:var(--text);padding:12px;border-radius:8px;font-family:'Space Mono',monospace;
+        font-size:11px;resize:vertical;outline:none" placeholder='{"data":{...},"signature":"...","timestamp":...}'></textarea>
+      <div style="margin-top:8px">
+        <button class="btn" onclick="verifySignature()">🔐 Verify Signature</button>
+      </div>
+      <div id="out-verify" class="output"><pre></pre></div>
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE -->
+  <div id="tab-arch" class="panel">
+    <h2>System Architecture</h2>
+    <p class="subtitle">Full data flow from external APIs to on-chain Intelligent Contracts.</p>
+
+    <div class="card">
+      <pre class="arch-pre">
+┌─────────────────────────────────────────────────┐
+│        Intelligent Contract (On-Chain)           │
+│                                                  │
+│  IAPIGateway gateway = IAPIGateway(ADDR);        │
+│  gateway.requestData("weather","current",...);   │
+│  // emits APIRequest event                       │
+└──────────────────┬──────────────────────────────┘
+                   │  on-chain event
+                   ▼
+┌─────────────────────────────────────────────────┐
+│         Oracle Keeper (Off-Chain Node)           │
+│                                                  │
+│  • Listens for APIRequest events                 │
+│  • Calls IC Proxy Service via HTTPS              │
+│  • Verifies HMAC signature on response           │
+│  • Submits signed data back on-chain             │
+└──────────────────┬──────────────────────────────┘
+                   │  HTTPS — API key injected server-side
+                   ▼
+┌─────────────────────────────────────────────────┐
+│     IC Proxy Service (This Repo — Vercel)        │
+│                                                  │
+│  /api/weather  → OpenWeatherMap API              │
+│  /api/price    → CoinGecko API                   │
+│  /api/social   → Twitter/X API v2                │
+│  /api/verify   → Signature verification          │
+│                                                  │
+│  • API keys in encrypted env vars                │
+│  • Rate limiting (60 req/min/IP)                 │
+│  • HMAC-SHA256 response signing                  │
+│  • CORS protection                               │
+└──────────────────┬──────────────────────────────┘
+         ┌─────────┼─────────┐
+         ▼         ▼         ▼
+   OpenWeather  CoinGecko  Twitter
+     API          API      API v2
+</pre>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📦 File Structure</div>
+      <pre class="arch-pre">ic-api-gateway/
+├── api/
+│   ├── weather.js       ← Real OpenWeatherMap proxy
+│   ├── price.js         ← Real CoinGecko proxy
+│   ├── social.js        ← Real Twitter v2 proxy
+│   └── verify.js        ← Health check + sig verify
+├── lib/
+│   ├── signer.js        ← HMAC-SHA256 response signing
+│   └── rateLimit.js     ← Per-IP rate limiting
+├── contracts/
+│   └── ICContracts.sol  ← On-chain interface + examples
+├── public/
+│   └── index.html       ← This studio UI
+├── .env.example         ← API key template
+├── vercel.json          ← Vercel deployment config
+├── package.json
+└── README.md</pre>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Base URL — auto-detects local vs deployed
+const BASE = window.location.origin;
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function showOutput(id, data, isError=false) {
+  const el = document.getElementById(id);
+  el.classList.add('show');
+  el.classList.toggle('error', isError);
+  el.querySelector('pre').textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+}
+
+async function apiFetch(url, btnEl) {
+  if(btnEl) btnEl.disabled = true, btnEl.textContent = '⏳ Loading…';
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if(btnEl) btnEl.disabled = false, btnEl.textContent = '▶ Call API';
+    return { data, ok: res.ok };
+  } catch(e) {
+    if(btnEl) btnEl.disabled = false, btnEl.textContent = '▶ Call API';
+    return { data: { error: e.message }, ok: false };
+  }
+}
+
+async function callWeather(action) {
+  const btn = event.target;
+  let url = `${BASE}/api/weather?action=${action}`;
+  if(action === 'current') {
+    const loc = document.getElementById('w-location').value || 'Karachi';
+    const units = document.getElementById('w-units').value;
+    url += `&location=${encodeURIComponent(loc)}&units=${units}`;
+  } else if(action === 'forecast') {
+    const loc = document.getElementById('w-fc-location').value || 'Dubai';
+    const days = document.getElementById('w-fc-days').value;
+    url += `&location=${encodeURIComponent(loc)}&days=${days}`;
+  } else if(action === 'alerts') {
+    const region = document.getElementById('w-region').value || 'Florida';
+    url += `&region=${encodeURIComponent(region)}`;
+  }
+  const { data, ok } = await apiFetch(url, btn);
+  showOutput(`out-weather-${action}`, data, !ok);
+}
+
+async function callPrice(action) {
+  const btn = event.target;
+  let url = `${BASE}/api/price?action=${action}`;
+  if(action === 'price') {
+    url += `&pair=${encodeURIComponent(document.getElementById('p-pair').value)}`;
+  } else if(action === 'twap') {
+    url += `&pair=${encodeURIComponent(document.getElementById('p-twap-pair').value)}`;
+    url += `&interval=${document.getElementById('p-interval').value}`;
+  } else if(action === 'multi') {
+    url += `&coins=${encodeURIComponent(document.getElementById('p-coins').value)}`;
+  }
+  const { data, ok } = await apiFetch(url, btn);
+  showOutput(`out-price-${action}`, data, !ok);
+}
+
+async function callSocial(action) {
+  const btn = event.target;
+  let url = `${BASE}/api/social?action=${action}`;
+  if(action === 'sentiment') {
+    const q = document.getElementById('s-query').value || '$ETH';
+    url += `&query=${encodeURIComponent(q)}`;
+  } else if(action === 'trending') {
+    url += `&category=${document.getElementById('s-category').value}`;
+  } else if(action === 'profile') {
+    const h = document.getElementById('s-handle').value || 'VitalikButerin';
+    url += `&handle=${encodeURIComponent(h)}`;
+  }
+  const { data, ok } = await apiFetch(url, btn);
+  showOutput(`out-social-${action}`, data, !ok);
+}
+
+async function verifySignature() {
+  const input = document.getElementById('verify-input').value.trim();
+  if(!input) return;
+  try {
+    const body = JSON.parse(input);
+    const res = await fetch(`${BASE}/api/verify`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    showOutput('out-verify', data, !data.valid);
+  } catch(e) {
+    showOutput('out-verify', { error: 'Invalid JSON: ' + e.message }, true);
+  }
+}
+</script>
+</body>
+</html>

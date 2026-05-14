@@ -1,0 +1,21 @@
+{
+  "name": "ic-api-gateway",
+  "version": "1.0.0",
+  "description": "Intelligent Contract API Gateway — secure proxy for weather, price, and social APIs",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "node-fetch": "^2.7.0",
+    "dotenv": "^16.3.1",
+    "express-rate-limit": "^7.1.5",
+    "crypto": "^1.0.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
