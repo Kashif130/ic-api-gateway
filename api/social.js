@@ -1,33 +1,24 @@
 // api/social.js
-// Social Signal Proxy — uses Reddit API (free, no key needed)
-// Reddit's public JSON API works without any authentication.
+// Social Signal Proxy — uses NewsAPI (free, 100 req/day)
+// Get free key at: https://newsapi.org/register
 // Endpoint: GET /api/social?action=sentiment&query=ethereum
 //           GET /api/social?action=trending&category=crypto
-//           GET /api/social?action=profile&handle=vitalik (Reddit username)
+//           GET /api/social?action=headlines&query=bitcoin
 
 const fetch = require("node-fetch");
 const { signResponse } = require("../lib/signer");
 
-// Subreddit map for categories
-const CATEGORY_SUBS = {
-  crypto:  "CryptoCurrency",
-  defi:    "defi",
-  nft:     "NFT",
-  web3:    "web3",
-  bitcoin: "bitcoin",
-  eth:     "ethereum",
-  solana:  "solana"
-};
+const NEWS_KEY = process.env.NEWSAPI_KEY;
+const BASE_URL = "https://newsapi.org/v2";
 
-// Simple sentiment from post titles
-function analyzeSentiment(posts) {
-  const positive = ["bullish", "moon", "pump", "surge", "ath", "green", "up", "buy",
-                    "strong", "great", "gain", "profit", "growth", "adoption", "🚀"];
-  const negative = ["bearish", "dump", "crash", "down", "red", "sell", "weak",
-                    "rekt", "fear", "scam", "rug", "loss", "drop", "fell"];
+function analyzeSentiment(articles) {
+  const positive = ["surge", "rally", "bullish", "gain", "rise", "up", "growth",
+    "adoption", "record", "high", "profit", "buy", "strong", "launch", "partnership"];
+  const negative = ["crash", "dump", "bearish", "fall", "drop", "down", "loss",
+    "hack", "ban", "fear", "sell", "weak", "fraud", "collapse", "warning"];
   let pos = 0, neg = 0;
-  for (const post of posts) {
-    const text = (post.title + " " + (post.selftext || "")).toLowerCase();
+  for (const a of articles) {
+    const text = ((a.title || "") + " " + (a.description || "")).toLowerCase();
     pos += positive.filter(w => text.includes(w)).length;
     neg += negative.filter(w => text.includes(w)).length;
   }
@@ -41,97 +32,90 @@ function analyzeSentiment(posts) {
   };
 }
 
-// GET sentiment — search Reddit for query
-async function getSentiment(query, limit = 25) {
-  const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=${limit}&type=link`;
-  const res  = await fetch(url, { headers: { "User-Agent": "ic-api-gateway/1.0" } });
-  if (!res.ok) throw new Error(`Reddit API error: ${res.status}`);
+async function getSentiment(query, limit = 20) {
+  if (!NEWS_KEY) throw new Error("NEWSAPI_KEY not configured on server");
+  const url = `${BASE_URL}/everything?q=${encodeURIComponent(query)}&language=en&sortBy=publishedAt&pageSize=${Math.min(limit, 100)}&apiKey=${NEWS_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`NewsAPI error: ${res.status}`);
   const d = await res.json();
-  const posts = d.data?.children?.map(c => c.data) || [];
-  if (!posts.length) return { query, volume: 0, sentiment: { score: 0.5, label: "neutral" }, posts: [] };
-
-  const sentiment = analyzeSentiment(posts);
+  if (d.status !== "ok") throw new Error(d.message || "NewsAPI error");
+  const articles = d.articles || [];
   return {
     query,
-    source: "Reddit",
-    volume: posts.length,
-    sentiment,
-    sample_posts: posts.slice(0, 3).map(p => ({
-      title: p.title?.substring(0, 120),
-      subreddit: `r/${p.subreddit}`,
-      upvotes: p.ups,
-      comments: p.num_comments,
-      created_at: new Date(p.created_utc * 1000).toISOString()
+    source: "NewsAPI",
+    volume: d.totalResults,
+    articles_analyzed: articles.length,
+    sentiment: analyzeSentiment(articles),
+    sample_articles: articles.slice(0, 3).map(a => ({
+      title: a.title?.substring(0, 120),
+      source: a.source?.name,
+      published: a.publishedAt
     }))
   };
 }
 
-// GET trending — hot posts from relevant subreddit
 async function getTrending(category, limit = 10) {
-  const sub = CATEGORY_SUBS[category.toLowerCase()] || "CryptoCurrency";
-  const url  = `https://www.reddit.com/r/${sub}/hot.json?limit=${limit}`;
-  const res   = await fetch(url, { headers: { "User-Agent": "ic-api-gateway/1.0" } });
-  if (!res.ok) throw new Error(`Reddit API error: ${res.status}`);
+  if (!NEWS_KEY) throw new Error("NEWSAPI_KEY not configured on server");
+  const qMap = {
+    crypto: "cryptocurrency OR bitcoin OR ethereum",
+    defi: "DeFi OR decentralized finance",
+    nft: "NFT OR non-fungible token",
+    web3: "web3 OR blockchain",
+    solana: "solana",
+    bitcoin: "bitcoin"
+  };
+  const q = qMap[category.toLowerCase()] || category;
+  const url = `${BASE_URL}/everything?q=${encodeURIComponent(q)}&language=en&sortBy=popularity&pageSize=${Math.min(limit, 20)}&apiKey=${NEWS_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`NewsAPI error: ${res.status}`);
   const d = await res.json();
-  const posts = d.data?.children?.map(c => c.data) || [];
-
-  // Extract trending keywords from titles
+  if (d.status !== "ok") throw new Error(d.message || "NewsAPI error");
   const wordCount = {};
-  for (const p of posts) {
-    const words = p.title.toLowerCase()
-      .replace(/[^a-z0-9$#\s]/g, "")
-      .split(/\s+/)
-      .filter(w => w.length > 3 && !["this","that","with","from","have","what","your","just","more","been"].includes(w));
+  for (const a of (d.articles || [])) {
+    const words = (a.title || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/)
+      .filter(w => w.length > 3 && !["this","that","with","from","have","what","your","just","more","been","will","says","after","over","into"].includes(w));
     for (const w of words) wordCount[w] = (wordCount[w] || 0) + 1;
   }
-  const topics = Object.entries(wordCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
+  const keywords = Object.entries(wordCount).sort((a,b)=>b[1]-a[1]).slice(0, limit)
     .map(([word, count]) => ({ keyword: word, mentions: count }));
-
   return {
     category,
-    subreddit: `r/${sub}`,
-    source: "Reddit",
-    topics,
-    hot_posts: posts.slice(0, 3).map(p => ({
-      title: p.title?.substring(0, 100),
-      upvotes: p.ups,
-      comments: p.num_comments,
-      url: `https://reddit.com${p.permalink}`
+    source: "NewsAPI",
+    trending_keywords: keywords,
+    top_articles: (d.articles || []).slice(0, 5).map(a => ({
+      title: a.title?.substring(0, 100),
+      source: a.source?.name,
+      published: a.publishedAt
     }))
   };
 }
 
-// GET profile — Reddit user public info
-async function getProfile(handle) {
-  const username = handle.replace(/^u\//, "").replace(/^@/, "");
-  const url = `https://www.reddit.com/user/${username}/about.json`;
-  const res  = await fetch(url, { headers: { "User-Agent": "ic-api-gateway/1.0" } });
-  if (!res.ok) throw new Error(`Reddit user not found: ${handle}`);
+async function getHeadlines(query, limit = 5) {
+  if (!NEWS_KEY) throw new Error("NEWSAPI_KEY not configured on server");
+  const url = `${BASE_URL}/everything?q=${encodeURIComponent(query)}&language=en&sortBy=publishedAt&pageSize=${Math.min(limit, 10)}&apiKey=${NEWS_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`NewsAPI error: ${res.status}`);
   const d = await res.json();
-  const u = d.data;
+  if (d.status !== "ok") throw new Error(d.message || "NewsAPI error");
   return {
-    handle: `u/${u.name}`,
-    name: u.name,
-    karma_post: u.link_karma,
-    karma_comment: u.comment_karma,
-    total_karma: u.total_karma,
-    verified: u.verified,
-    created_at: new Date(u.created_utc * 1000).toISOString(),
-    is_mod: u.is_mod,
-    source: "Reddit"
+    query,
+    source: "NewsAPI",
+    total_results: d.totalResults,
+    headlines: (d.articles || []).map(a => ({
+      title: a.title,
+      source: a.source?.name,
+      published: a.publishedAt
+    }))
   };
 }
 
-// Main Vercel handler
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Content-Type", "application/json");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const { action = "sentiment", query, category, handle, limit = 10 } = req.query;
+  const { action = "sentiment", query, category, limit = 10 } = req.query;
 
   try {
     let result;
@@ -141,20 +125,18 @@ module.exports = async function handler(req, res) {
         result = await getSentiment(query, parseInt(limit));
         break;
       case "trending":
-        if (!category) return res.status(400).json({ error: "category required. Use: crypto, defi, nft, web3, bitcoin, eth, solana" });
+        if (!category) return res.status(400).json({ error: "category required. Use: crypto, defi, nft, web3, bitcoin, solana" });
         result = await getTrending(category, parseInt(limit));
         break;
-      case "profile":
-        if (!handle) return res.status(400).json({ error: "handle required. Example: vitalik" });
-        result = await getProfile(handle);
+      case "headlines":
+        if (!query) return res.status(400).json({ error: "query param required" });
+        result = await getHeadlines(query, parseInt(limit));
         break;
       default:
-        return res.status(400).json({ error: `Unknown action: ${action}. Use: sentiment, trending, profile` });
+        return res.status(400).json({ error: `Unknown action: ${action}. Use: sentiment, trending, headlines` });
     }
-
     const signed = signResponse(result);
     return res.status(200).json({ ok: true, action, ...signed });
-
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
   }
