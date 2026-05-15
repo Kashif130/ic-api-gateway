@@ -1,17 +1,10 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/*.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/(.*)", "dest": "/public/$1" }
+  "rewrites": [
+    { "source": "/api/weather", "destination": "/api/weather.js" },
+    { "source": "/api/price",   "destination": "/api/price.js"   },
+    { "source": "/api/social",  "destination": "/api/social.js"  },
+    { "source": "/api/verify",  "destination": "/api/verify.js"  },
+    { "source": "/(.*)",        "destination": "/public/index.html" }
   ]
 }
